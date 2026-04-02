@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { zipLocations } from "../data/zipcodes";
 
 const translations = {
   en: {
@@ -10,7 +11,7 @@ const translations = {
     search: "Find Stores",
     nearby: "Store Comparison",
     errorZip: "Please enter a ZIP code",
-    unsupportedZip: "ZIP not supported yet",
+    invalidZip: "ZIP code not found in our starter database yet",
     groceryList: "Grocery List",
     placeholder: "milk x2, eggs, bread, rice, chicken",
     delivery: "Delivery",
@@ -50,8 +51,6 @@ const translations = {
     bestPrice: "Best price",
     selectedStoreForItem: "Selected store",
     suggestedItems: "Suggested items to unlock delivery",
-    addSuggestions: "Add these items to reach delivery minimum",
-    noSuggestions: "No suggestions available yet",
     addToList: "Add to list",
     deliveryGap: "Delivery gap",
   },
@@ -62,7 +61,7 @@ const translations = {
     search: "Buscar Tiendas",
     nearby: "Comparación de Tiendas",
     errorZip: "Por favor ingresa un código postal",
-    unsupportedZip: "Código postal aún no compatible",
+    invalidZip: "Ese código postal todavía no está en nuestra base de datos inicial",
     groceryList: "Lista de Compras",
     placeholder: "leche x2, huevos, pan, arroz, pollo",
     delivery: "Entrega",
@@ -102,8 +101,6 @@ const translations = {
     bestPrice: "Mejor precio",
     selectedStoreForItem: "Tienda seleccionada",
     suggestedItems: "Artículos sugeridos para desbloquear entrega",
-    addSuggestions: "Agrega estos artículos para alcanzar el mínimo de entrega",
-    noSuggestions: "Aún no hay sugerencias disponibles",
     addToList: "Agregar a la lista",
     deliveryGap: "Falta para entrega",
   },
@@ -119,19 +116,11 @@ type OptimizeMode =
 type StoreData = {
   name: string;
   city: string;
+  state: string;
+  zip: string;
   lat: number;
   lng: number;
   prices: Record<string, number>;
-};
-
-type ResultStore = {
-  name: string;
-  city: string;
-  total: number;
-  matchedItems: string[];
-  itemPrices: { item: string; price: number; quantity: number }[];
-  deliveryEligible: boolean;
-  pickupEligible: boolean;
 };
 
 type ParsedItem = {
@@ -139,10 +128,24 @@ type ParsedItem = {
   quantity: number;
 };
 
+type ResultStore = {
+  name: string;
+  city: string;
+  state: string;
+  zip: string;
+  total: number;
+  matchedItems: string[];
+  itemPrices: { item: string; price: number; quantity: number }[];
+  deliveryEligible: boolean;
+  pickupEligible: boolean;
+};
+
 type SmartAssignment = {
   item: string;
   storeName: string;
   city: string;
+  state: string;
+  zip: string;
   price: number;
   quantity: number;
 };
@@ -150,6 +153,8 @@ type SmartAssignment = {
 type SmartStoreSummary = {
   storeName: string;
   city: string;
+  state: string;
+  zip: string;
   subtotal: number;
   items: { item: string; price: number; quantity: number }[];
   pickupEligible: boolean;
@@ -162,6 +167,8 @@ type ItemChoice = {
   options: {
     storeName: string;
     city: string;
+    state: string;
+    zip: string;
     totalPrice: number;
     unitPrice: number;
   }[];
@@ -178,6 +185,8 @@ const storeData: StoreData[] = [
   {
     name: "Aldi",
     city: "Elgin",
+    state: "IL",
+    zip: "60123",
     lat: 42.0354,
     lng: -88.2826,
     prices: {
@@ -200,6 +209,8 @@ const storeData: StoreData[] = [
   {
     name: "Walmart",
     city: "Carpentersville",
+    state: "IL",
+    zip: "60110",
     lat: 42.1211,
     lng: -88.2579,
     prices: {
@@ -222,6 +233,8 @@ const storeData: StoreData[] = [
   {
     name: "Target",
     city: "South Elgin",
+    state: "IL",
+    zip: "60177",
     lat: 41.9942,
     lng: -88.2923,
     prices: {
@@ -244,6 +257,8 @@ const storeData: StoreData[] = [
   {
     name: "Jewel Osco",
     city: "Elgin",
+    state: "IL",
+    zip: "60120",
     lat: 42.0372,
     lng: -88.2837,
     prices: {
@@ -266,6 +281,8 @@ const storeData: StoreData[] = [
   {
     name: "Costco",
     city: "St. Charles",
+    state: "IL",
+    zip: "60174",
     lat: 41.9139,
     lng: -88.3126,
     prices: {
@@ -285,13 +302,55 @@ const storeData: StoreData[] = [
       sauce: 2.19,
     },
   },
+  {
+    name: "Whole Foods",
+    city: "Chicago",
+    state: "IL",
+    zip: "60614",
+    lat: 41.9227,
+    lng: -87.6533,
+    prices: {
+      milk: 4.79,
+      eggs: 4.19,
+      bread: 3.49,
+      rice: 6.99,
+      chicken: 7.49,
+      bananas: 0.89,
+      cheese: 4.29,
+      cereal: 4.99,
+      beans: 3.79,
+      tortillas: 3.49,
+      apples: 4.99,
+      yogurt: 4.19,
+      pasta: 2.49,
+      sauce: 3.29,
+    },
+  },
+  {
+    name: "Tony's Fresh Market",
+    city: "Chicago",
+    state: "IL",
+    zip: "60639",
+    lat: 41.92,
+    lng: -87.7553,
+    prices: {
+      milk: 3.99,
+      eggs: 3.49,
+      bread: 2.79,
+      rice: 5.89,
+      chicken: 5.99,
+      bananas: 0.72,
+      cheese: 3.19,
+      cereal: 3.99,
+      beans: 2.99,
+      tortillas: 2.79,
+      apples: 4.19,
+      yogurt: 3.29,
+      pasta: 1.99,
+      sauce: 2.79,
+    },
+  },
 ];
-
-const zipLocations: Record<string, { lat: number; lng: number }> = {
-  "60123": { lat: 42.0372, lng: -88.2812 },
-  "60120": { lat: 42.0395, lng: -88.268 },
-  "60110": { lat: 42.1211, lng: -88.2579 },
-};
 
 function getDistance(lat1: number, lng1: number, lat2: number, lng2: number) {
   const toRad = (value: number) => (value * Math.PI) / 180;
@@ -375,6 +434,8 @@ export default function Home() {
                 item: entry.item,
                 storeName: manualStore.name,
                 city: manualStore.city,
+                state: manualStore.state,
+                zip: manualStore.zip,
                 price: manualPrice * entry.quantity,
                 quantity: entry.quantity,
               };
@@ -389,6 +450,8 @@ export default function Home() {
                     item: entry.item,
                     storeName: store.name,
                     city: store.city,
+                    state: store.state,
+                    zip: store.zip,
                     price: unitPrice * entry.quantity,
                     quantity: entry.quantity,
                   }
@@ -454,6 +517,8 @@ export default function Home() {
         grouped.set(key, {
           storeName: assignment.storeName,
           city: assignment.city,
+          state: assignment.state,
+          zip: assignment.zip,
           subtotal: assignment.price,
           items: [
             {
@@ -498,6 +563,8 @@ export default function Home() {
             ? {
                 storeName: store.name,
                 city: store.city,
+                state: store.state,
+                zip: store.zip,
                 totalPrice: unitPrice * entry.quantity,
                 unitPrice,
               }
@@ -551,15 +618,15 @@ export default function Home() {
   }, [smartSummary, visibleStores]);
 
   const handleSearch = () => {
-    if (!zip) {
+    if (!zip.trim()) {
       alert(t.errorZip);
       return;
     }
 
-    const userLocation = zipLocations[zip];
+    const userLocation = zipLocations.find((z) => z.zip === zip.trim());
 
     if (!userLocation) {
-      alert(t.unsupportedZip);
+      alert(t.invalidZip);
       return;
     }
 
@@ -598,6 +665,8 @@ export default function Home() {
         return {
           name: store.name,
           city: store.city,
+          state: store.state,
+          zip: store.zip,
           total,
           matchedItems,
           itemPrices,
@@ -642,50 +711,54 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+    <main className="min-h-screen bg-gray-100 text-black flex items-center justify-center p-6">
       <div className="bg-white p-6 rounded-2xl shadow-md w-full max-w-6xl">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">{t.appName}</h1>
+          <h1 className="text-3xl font-bold text-slate-900">{t.appName}</h1>
 
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
-            className="border rounded px-2 py-1"
+            className="border rounded px-2 py-1 text-black bg-white"
           >
             <option value="en">EN</option>
             <option value="es">ES</option>
           </select>
         </div>
 
-        <label className="block text-sm font-medium mb-1">
+        <label className="block text-sm font-medium mb-1 text-slate-800">
           {t.groceryList}
         </label>
         <textarea
           value={groceryInput}
           onChange={(e) => setGroceryInput(e.target.value)}
           placeholder={t.placeholder}
-          className="w-full border rounded-lg px-3 py-2 mb-4"
+          className="w-full border rounded-lg px-3 py-2 mb-4 text-black placeholder-gray-400 bg-white"
           rows={3}
         />
 
         <div className="grid md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">{t.zip}</label>
+            <label className="block text-sm font-medium mb-1 text-slate-800">
+              {t.zip}
+            </label>
             <input
               type="text"
-              placeholder="60123"
+              placeholder="Enter any supported U.S. ZIP"
               value={zip}
               onChange={(e) => setZip(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 mb-4"
+              className="w-full border rounded-lg px-3 py-2 mb-4 text-black placeholder-gray-400 bg-white"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">{t.radius}</label>
+            <label className="block text-sm font-medium mb-1 text-slate-800">
+              {t.radius}
+            </label>
             <select
               value={radius}
               onChange={(e) => setRadius(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 mb-4"
+              className="w-full border rounded-lg px-3 py-2 mb-4 text-black bg-white"
             >
               <option value="5">5 miles</option>
               <option value="10">10 miles</option>
@@ -695,13 +768,13 @@ export default function Home() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-1 text-slate-800">
               {t.optimizeFor}
             </label>
             <select
               value={optimizeMode}
               onChange={(e) => setOptimizeMode(e.target.value as OptimizeMode)}
-              className="w-full border rounded-lg px-3 py-2 mb-4"
+              className="w-full border rounded-lg px-3 py-2 mb-4 text-black bg-white"
             >
               <option value="lowest-total">{t.lowestTotal}</option>
               <option value="pickup-eligible">{t.pickupEligible}</option>
@@ -719,7 +792,7 @@ export default function Home() {
         </button>
 
         {results.length === 0 && normalizedItems.length > 0 && (
-          <div className="mt-6 rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">
+          <div className="mt-6 rounded-xl border bg-slate-50 p-4 text-sm text-slate-700">
             {t.noMatch}
           </div>
         )}
@@ -727,24 +800,24 @@ export default function Home() {
         {results.length > 0 && (
           <>
             <div className="mt-6 rounded-xl border bg-slate-50 p-4">
-              <h2 className="text-lg font-semibold mb-3">
+              <h2 className="text-lg font-semibold mb-3 text-slate-900">
                 {t.finalCartSummary}
               </h2>
 
               <div className="grid md:grid-cols-3 gap-3 text-sm">
                 <div className="rounded-lg bg-white border p-3">
                   <p className="text-slate-500">{t.totalItems}</p>
-                  <p className="font-semibold mt-1">{totalItemCount}</p>
+                  <p className="font-semibold mt-1 text-slate-900">{totalItemCount}</p>
                 </div>
 
                 <div className="rounded-lg bg-white border p-3">
                   <p className="text-slate-500">{t.totalStores}</p>
-                  <p className="font-semibold mt-1">{smartSummary.length}</p>
+                  <p className="font-semibold mt-1 text-slate-900">{smartSummary.length}</p>
                 </div>
 
                 <div className="rounded-lg bg-white border p-3">
                   <p className="text-slate-500">{t.estimatedGrandTotal}</p>
-                  <p className="font-semibold mt-1">${smartTotal.toFixed(2)}</p>
+                  <p className="font-semibold mt-1 text-slate-900">${smartTotal.toFixed(2)}</p>
                 </div>
               </div>
 
@@ -757,25 +830,23 @@ export default function Home() {
                   <p className="text-sm font-semibold text-indigo-700">
                     {t.smartSplit}
                   </p>
-                  <p className="text-sm text-slate-600 mt-1">
+                  <p className="text-sm text-slate-700 mt-1">
                     {t.smartSplitDesc}
                   </p>
 
                   <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div className="rounded-lg bg-white border p-3">
                       <p className="text-slate-500">{t.cheapestSingleStore}</p>
-                      <p className="font-semibold mt-1">
+                      <p className="font-semibold mt-1 text-slate-900">
                         {cheapestSingleStore
-                          ? `${cheapestSingleStore.name} • $${cheapestSingleStore.total.toFixed(
-                              2
-                            )}`
+                          ? `${cheapestSingleStore.name} • $${cheapestSingleStore.total.toFixed(2)}`
                           : "—"}
                       </p>
                     </div>
 
                     <div className="rounded-lg bg-white border p-3">
                       <p className="text-slate-500">{t.smartCartPlan}</p>
-                      <p className="font-semibold mt-1">
+                      <p className="font-semibold mt-1 text-slate-900">
                         ${smartTotal.toFixed(2)}
                       </p>
                     </div>
@@ -790,7 +861,9 @@ export default function Home() {
                   </p>
                 </div>
 
-                <h2 className="font-semibold text-lg mb-3">{t.smartCartPlan}</h2>
+                <h2 className="font-semibold text-lg mb-3 text-slate-900">
+                  {t.smartCartPlan}
+                </h2>
                 <div className="space-y-4">
                   {smartSummary.map((group) => (
                     <div
@@ -798,10 +871,12 @@ export default function Home() {
                       className="border rounded-xl p-4 bg-slate-50"
                     >
                       <div>
-                        <p className="font-semibold text-lg">
+                        <p className="font-semibold text-lg text-slate-900">
                           {group.storeName}
                         </p>
-                        <p className="text-sm text-slate-600">{group.city}</p>
+                        <p className="text-sm text-slate-600">
+                          {group.city}, {group.state} {group.zip}
+                        </p>
                         <p className="text-sm text-green-600 font-semibold mt-1">
                           {t.subtotal}: ${group.subtotal.toFixed(2)}
                         </p>
@@ -814,14 +889,14 @@ export default function Home() {
                             className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border"
                           >
                             <div>
-                              <span className="capitalize text-sm">
+                              <span className="capitalize text-sm text-slate-900">
                                 {itemPrice.item}
                               </span>
                               <span className="text-xs text-slate-500 ml-2">
                                 {t.quantity}: {itemPrice.quantity}
                               </span>
                             </div>
-                            <span className="text-sm font-semibold">
+                            <span className="text-sm font-semibold text-slate-900">
                               ${itemPrice.price.toFixed(2)}
                             </span>
                           </div>
@@ -880,9 +955,7 @@ export default function Home() {
                                     {t.addToList}
                                   </button>
                                 </>
-                              ) : (
-                                <p className="text-xs">{t.noSuggestions}</p>
-                              )}
+                              ) : null}
                             </div>
                           )}
                         </div>
@@ -912,7 +985,7 @@ export default function Home() {
               </div>
 
               <div>
-                <h2 className="font-semibold text-lg mb-3">
+                <h2 className="font-semibold text-lg mb-3 text-slate-900">
                   {t.chooseStorePerItem}
                 </h2>
                 <p className="text-sm text-slate-600 mb-4">
@@ -924,7 +997,7 @@ export default function Home() {
                     <div key={choice.item} className="border rounded-xl p-4 bg-slate-50">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className="font-semibold capitalize">{choice.item}</p>
+                          <p className="font-semibold capitalize text-slate-900">{choice.item}</p>
                           <p className="text-sm text-slate-600">
                             {t.quantity}: {choice.quantity}
                           </p>
@@ -936,7 +1009,7 @@ export default function Home() {
                         )}
                       </div>
 
-                      <label className="block text-sm font-medium mb-2">
+                      <label className="block text-sm font-medium mb-2 text-slate-800">
                         {t.selectedStoreForItem}
                       </label>
                       <select
@@ -944,11 +1017,11 @@ export default function Home() {
                         onChange={(e) =>
                           handleStoreSelectionChange(choice.item, e.target.value)
                         }
-                        className="w-full border rounded-lg px-3 py-2"
+                        className="w-full border rounded-lg px-3 py-2 text-black bg-white"
                       >
                         {choice.options.map((option) => (
                           <option key={`${choice.item}-${option.storeName}`} value={option.storeName}>
-                            {option.storeName} • {option.city} • ${option.totalPrice.toFixed(2)}
+                            {option.storeName} • {option.city}, {option.state} {option.zip} • ${option.totalPrice.toFixed(2)}
                           </option>
                         ))}
                       </select>
@@ -958,7 +1031,9 @@ export default function Home() {
               </div>
 
               <div>
-                <h2 className="font-semibold text-lg mb-3">{t.nearby}</h2>
+                <h2 className="font-semibold text-lg mb-3 text-slate-900">
+                  {t.nearby}
+                </h2>
                 <div className="space-y-4">
                   {results.map((store, index) => (
                     <div
@@ -971,8 +1046,10 @@ export default function Home() {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <p className="font-semibold text-lg">{store.name}</p>
-                          <p className="text-sm text-gray-600">{store.city}</p>
+                          <p className="font-semibold text-lg text-slate-900">{store.name}</p>
+                          <p className="text-sm text-gray-600">
+                            {store.city}, {store.state} {store.zip}
+                          </p>
                           <p className="text-sm text-green-600 font-semibold mt-1">
                             ${store.total.toFixed(2)} total
                           </p>
@@ -993,7 +1070,7 @@ export default function Home() {
                       </div>
 
                       <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">
+                        <p className="text-sm font-medium mb-2 text-slate-800">
                           {t.itemBreakdown}
                         </p>
                         <div className="space-y-2">
@@ -1003,14 +1080,14 @@ export default function Home() {
                               className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border"
                             >
                               <div>
-                                <span className="capitalize text-sm">
+                                <span className="capitalize text-sm text-slate-900">
                                   {itemPrice.item}
                                 </span>
                                 <span className="text-xs text-slate-500 ml-2">
                                   {t.quantity}: {itemPrice.quantity}
                                 </span>
                               </div>
-                              <span className="text-sm font-semibold">
+                              <span className="text-sm font-semibold text-slate-900">
                                 ${itemPrice.price.toFixed(2)}
                               </span>
                             </div>
